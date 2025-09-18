@@ -43,7 +43,7 @@ n_batches = (n_samples + batch_size - 1) // batch_size
 
 for epoch in range(epochs):
     # Mezclar los datos en cada época
-    indices = np.random.permutati 
+    indices = np.random.permutation(n_samples) 
     X_shuffled = X_train[indices]
     y_shuffled = y_train_onehot[indices]
     y_labels_shuffled = y_train[indices]
@@ -68,6 +68,11 @@ for epoch in range(epochs):
         loss = DnnLib.cross_entropy(output, y_batch)
         
         # Backward pass
+        # Aca no se ocupa derivada de softmax, el ing dio una razon
+        # El ing nos dijo que probaramos hacer esta funcion nosotros mismos y probar
+
+        # Solo en el caso especial de que se usa SOFTMAX en la capa de salida junto con CCE se calcula de un solo el gradiente multiplicado de los 2
+        # Es el unico caso en el que la regla de la cadena no funciona, por que sale un mega gradiente y de  esta manera se simplifica
         grad = DnnLib.cross_entropy_gradient(output, y_batch)
         grad = layers[1].backward(grad)  # Gradiente para capa de salida
         grad = layers[0].backward(grad)  # Gradiente para capa oculta
