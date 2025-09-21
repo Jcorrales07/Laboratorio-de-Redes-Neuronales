@@ -1,6 +1,8 @@
+import json
 import numpy as np
 import DnnLib
-import json
+
+from neural_network import forward
 
 def to_one_hot(labels):
     one_hot_labels = []
@@ -41,29 +43,6 @@ def load_data(train_path='mnist_train.npz', test_path='mnist_test.npz', scale=25
         
     return (train_images, train_labels, train_oh), (val_images, val_labels, val_oh), (test_images, test_labels, test_oh)
 
-def build_model():
-    layers = [
-        DnnLib.DenseLayer(784, 128, DnnLib.ActivationType.RELU),
-        DnnLib.DenseLayer(128, 10, DnnLib.ActivationType.SOFTMAX)
-    ]
-
-    optimizer = DnnLib.Adam(learning_rate=0.001)
-    return layers, optimizer
-
-def forward(layers, batch):
-    out = batch
-    for layer in layers:
-        out = layer.forward(out)
-    return out
-
-def backward(layers, grad):
-    for layer in reversed(layers):
-        grad = layer.backward(grad)
-        
-def update_params(optimizer, layers):
-    for layer in reversed(layers):
-        optimizer.update(layer)
-        
 def get_data_batch(n_batch, batch_size, n_samples, train_data):
     start_idx = n_batch
     end_idx = min(n_batch + batch_size, n_samples)
@@ -114,7 +93,8 @@ def save_model(layers, input_space, preprocess, model_acc, filename="mnist_model
 
         model['layers'].append(layer_data)
 
-    filename = f"{filename}{model_acc:.3f}.json"
+    if filename == 'mnist_model_' or filename == 'fashion_mnist_model_':
+        filename = f"{filename}{model_acc:.3f}.json"
 
     with open(filename, "w") as f:
         json.dump(model, f)
@@ -151,56 +131,3 @@ def load_model(filename, test_data):
     print(f"Model Test | Accuracy: {(test_acc * 100):.2f}%")
 
     return layers
-
-def train_model(layers, n_samples, train_data, val_data, epochs=15, batch_size=216):
-    print("Starting model training...\n")
-    print(f"With Epochs: {epochs} Batch size: {batch_size} \n")
-    print("Epochs results: \n")
-    
-    for epoch in range(1, epochs + 1):
-        epoch_loss, epoch_acc = [], []
-        
-        for n_batch in range(0, n_samples, batch_size):
-            
-            # Calculando el batch
-            batch, batch_labels, batch_oh = get_data_batch(n_batch, batch_size, n_samples, train_data)
-
-            # Calculo Forward
-            output = forward(layers, batch)
-
-            # Calculo de Perdida 
-            loss = DnnLib.cross_entropy(output, batch_oh)
-            
-            # Calculo de Precision
-            accuracy = get_accuracy(output, batch_oh)
-            
-            epoch_loss.append(loss)
-            epoch_acc.append(accuracy)
-            
-            # Calculo de gradiente SCCE
-            scce_gradient = DnnLib.cross_entropy_gradient(output, batch_oh)
-
-            # Calculo Backward
-            gradient = backward(layers, scce_gradient)
-
-            # Actualizacion de parametros
-            update_params(optimizer, layers)
-
-        e_m = get_epoch_metrics(epoch_loss, epoch_acc)
-        print(f"Epoch (Training) # {epoch} | Loss : {e_m['avg_loss']:.2f} | Accuracy: {(e_m['avg_acc'] * 100):.2f}%")
-
-        _, val_loss, val_acc = model_evaluation(layers, val_data)
-        print(f"Epoch (Val)      # {epoch} | Loss : {val_loss:.2f} | Accuracy: {(val_acc * 100):.2f}%")
-
-
-train_data, val_data, test_data = load_data()
-
-layers, optimizer = build_model()
-
-train_model(layers, train_data[0].shape[0], train_data, val_data)
-
-_, _, test_acc = model_evaluation(layers, test_data)
-
-print(f"Model Test | Accuracy: {(test_acc * 100):.2f}%")
-
-save_model(layers, [28, 28], {"scale": 255.0}, test_acc)
