@@ -1,28 +1,51 @@
 import DnnLib
-from utils import get_data_batch, get_accuracy, get_epoch_metrics, model_evaluation
+from utils import get_data_batch, get_accuracy, get_epoch_metrics
 
 def build_model(learning_rate=0.001):
     layers = [
         DnnLib.DenseLayer(784, 128, DnnLib.ActivationType.RELU),
+        DnnLib.Dropout(dropout_rate=0.5),
         DnnLib.DenseLayer(128, 10, DnnLib.ActivationType.SOFTMAX)
     ]
+    
+    for layer in layers:
+        if hasattr(layer, "training"):
+            continue
+        layer.set_regularizer(DnnLib.RegularizerType.L2, 0.001)
 
     optimizer = DnnLib.Adam(learning_rate=learning_rate)
     return layers, optimizer
 
-def forward(layers, batch):
+def forward(layers, batch, training=True):
     out = batch
     for layer in layers:
+        if hasattr(layer, "training"):
+            layer.training = training
         out = layer.forward(out)
     return out
 
-def backward(layers, grad):
+def backward(layers, gradient):
+    grad = gradient
     for layer in reversed(layers):
         grad = layer.backward(grad)
+    return grad
         
 def update_params(optimizer, layers):
     for layer in reversed(layers):
+        if hasattr(layer, "training"):
+            continue
         optimizer.update(layer)
+        
+def model_evaluation(layers, data):
+    # Calculo Forward
+    output = forward(layers, data[0], training=False)
+    
+    # Calculo de Perdida
+    loss = DnnLib.cross_entropy(output, data[2])
+    
+    # Calculo de Precision
+    accuracy = get_accuracy(output, data[2])
+    return output, loss, accuracy
         
 def train_model(layers, n_samples, optimizer, train_data, val_data, epochs=15, batch_size=216):
     print("Starting model training...\n")
@@ -38,7 +61,7 @@ def train_model(layers, n_samples, optimizer, train_data, val_data, epochs=15, b
             batch, batch_labels, batch_oh = get_data_batch(n_batch, batch_size, n_samples, train_data)
 
             # Calculo Forward
-            output = forward(layers, batch)
+            output = forward(layers, batch, training=True)
 
             # Calculo de Perdida 
             loss = DnnLib.cross_entropy(output, batch_oh)

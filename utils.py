@@ -2,8 +2,6 @@ import json
 import numpy as np
 import DnnLib
 
-from neural_network import forward
-
 def to_one_hot(labels):
     one_hot_labels = []
 
@@ -63,16 +61,7 @@ def get_epoch_metrics(epoch_loss, epoch_acc):
     avg_acc = np.array(epoch_acc).mean()
     return { "avg_loss": avg_loss, "avg_acc": avg_acc }
 
-def model_evaluation(layers, data):
-    # Calculo Forward
-    output = forward(layers, data[0])
-    
-    # Calculo de Perdida
-    loss = DnnLib.cross_entropy(output, data[2])
-    
-    # Calculo de Precision
-    accuracy = get_accuracy(output, data[2])
-    return output, loss, accuracy
+
 
 def save_model(layers, input_space, preprocess, model_acc, filename="mnist_model_"):
 
@@ -83,6 +72,9 @@ def save_model(layers, input_space, preprocess, model_acc, filename="mnist_model
     }
 
     for layer in layers:
+        if hasattr(layer, "training"):
+            continue
+        
         layer_data = {
             "type" : "dense",
             "units" : len(layer.bias),
@@ -95,6 +87,9 @@ def save_model(layers, input_space, preprocess, model_acc, filename="mnist_model
 
     if filename == 'mnist_model_' or filename == 'fashion_mnist_model_':
         filename = f"{filename}{model_acc:.3f}.json"
+    else:
+        filename = filename.split('.')[0]
+        filename = f"{filename}.json"
 
     with open(filename, "w") as f:
         json.dump(model, f)
@@ -106,7 +101,6 @@ def load_model(filename, test_data):
         model_loaded = json.load(f)
 
     loaded_layers = model_loaded['layers']
-    scale = model_loaded['preprocess']['scale']
 
     layers = []
 
@@ -126,8 +120,6 @@ def load_model(filename, test_data):
 
         layers.append(new_layer)
 
-    _, _, test_acc = model_evaluation(layers, test_data)
     print('Model loaded correctly')
-    print(f"Model Test | Accuracy: {(test_acc * 100):.2f}%")
 
     return layers
